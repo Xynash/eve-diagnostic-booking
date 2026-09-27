@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -20,6 +22,13 @@ def create_booking(
     centre_test = db.query(CentreTest).filter(CentreTest.id == payload.centre_test_id).first()
     if not centre_test:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found at this centre")
+
+    appointment_time = payload.appointment_time
+    if appointment_time.tzinfo is None:
+        appointment_time = appointment_time.replace(tzinfo=timezone.utc)
+
+    if appointment_time <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Appointment time must be in the future")
 
     booking = Booking(
         user_id=current_user.id,
@@ -67,8 +76,11 @@ def cancel_booking(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     if booking.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to cancel this booking")
-    if booking.status == BookingStatus.CONFIRMED:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot cancel a confirmed booking")
+    if booking.status != BookingStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel a booking with status: {booking.status.value}",
+        )
 
     booking.status = BookingStatus.CANCELLED
     db.commit()
