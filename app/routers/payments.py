@@ -2,6 +2,7 @@ import random
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -9,7 +10,9 @@ from app.core.deps import get_current_user
 from app.models.booking import Booking, BookingStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
+from app.models.webhook_event import WebhookEvent
 from app.schemas.payment import PaymentCreate, PaymentOut
+from app.schemas.webhook import PaymentWebhookPayload
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -48,3 +51,32 @@ def process_payment(
     db.refresh(payment)
 
     return payment
+
+
+@router.post("/webhook/", status_code=status.HTTP_200_OK)
+def payment_webhook(payload: PaymentWebhookPayload, db: Session = Depends(get_db)):
+    existing_event = db.query(WebhookEvent).filter(WebhookEvent.event_id == payload.event_id).first()
+    if existing_event:
+        return {"detail": "Event already processed", "event_id": payload.event_id}
+
+    payment = db.query(Payment).filter(Payment.transaction_id == payload.transaction_id).first()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found for this transaction")
+
+    booking = db.query(Booking).filter(Booking.id == payment.booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found for this payment")
+
+    payment.status = payload.status
+    booking.status = BookingStatus.CONFIRMED if payload.status == PaymentStatus.SUCCESS else BookingStatus.FAILED
+
+    webhook_event = WebhookEvent(event_id=payload.event_id, payload=payload.model_dump_json())
+    db.add(webhook_event)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return {"detail": "Event already processed", "event_id": payload.event_id}
+
+    return {"detail": "Webhook processed", "booking_status": booking.status.value}
