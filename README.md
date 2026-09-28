@@ -44,6 +44,10 @@ alembic/      migrations
 | POST | `/auth/login` | no | Returns a JWT |
 | GET | `/centres/` | no | List centres with their tests and prices |
 | GET | `/centres/{id}` | no | One centre |
+| POST | `/centres/` | yes | Create a centre |
+| POST | `/centres/{id}/tests` | yes | Offer a test at a centre with a price |
+| GET | `/tests/` | no | List all tests |
+| POST | `/tests/` | yes | Create a test |
 | POST | `/bookings/` | yes | Create a booking (starts `PENDING`) |
 | GET | `/bookings/` | yes | Your bookings |
 | GET | `/bookings/{id}` | yes | One of your bookings |
@@ -106,7 +110,7 @@ Every webhook carries an `event_id`. The handler first checks `webhook_events` f
 - The webhook payload identifies the payment by `transaction_id`, and `event_id` is the idempotency key.
 - A booking can only be paid while `PENDING`, and only cancelled while `PENDING`.
 - Appointment times must be in the future. Times sent without a timezone are treated as UTC.
-- Centres and tests are read-only through the API and managed through the seed script.
+- Any authenticated user can create centres and tests. There are no admin roles, so in production these routes would be restricted to staff.
 - JWTs expire after 60 minutes. There are no refresh tokens.
 - Users can only see and act on their own bookings (403 otherwise).
 
@@ -116,7 +120,7 @@ Every webhook carries an `event_id`. The handler first checks `webhook_events` f
 - Add a proper booking state machine. Right now a webhook can move a booking to any status, including one that was cancelled.
 - Check the webhook amount against the payment amount.
 - Lock the booking row during payment so two simultaneous requests can't both pay.
-- Admin endpoints for managing centres and tests, plus filtering by location.
+- Admin roles for managing centres and tests, plus filtering by location.
 - Pagination on list endpoints.
 - Structured logging, rate limiting, and a retry queue for webhook processing.
 - Run the tests against Postgres in CI instead of SQLite.

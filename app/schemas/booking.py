@@ -15,6 +15,9 @@ class BookingOut(BaseModel):
     id: int
     user_id: int
     centre_test_id: int
+    centre_name: str
+    centre_location: str
+    test_name: str
     appointment_time: datetime
     amount: Decimal
     status: BookingStatus

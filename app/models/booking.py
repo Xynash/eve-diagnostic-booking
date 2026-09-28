@@ -1,6 +1,7 @@
 import enum
 
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Enum, Numeric
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -23,3 +24,17 @@ class Booking(Base):
     amount = Column(Numeric(10, 2), nullable=False)
     status = Column(Enum(BookingStatus), nullable=False, default=BookingStatus.PENDING)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    centre_test = relationship("CentreTest")
+
+    @property
+    def centre_name(self):
+        return self.centre_test.centre.name
+
+    @property
+    def centre_location(self):
+        return self.centre_test.centre.location
+
+    @property
+    def test_name(self):
+        return self.centre_test.test.name
