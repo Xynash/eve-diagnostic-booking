@@ -1,14 +1,13 @@
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class TestOut(BaseModel):
     id: int
     name: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CentreTestOut(BaseModel):
@@ -16,8 +15,7 @@ class CentreTestOut(BaseModel):
     price: Decimal
     test: TestOut
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CentreOut(BaseModel):
@@ -26,5 +24,4 @@ class CentreOut(BaseModel):
     location: str
     tests: list[CentreTestOut] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
