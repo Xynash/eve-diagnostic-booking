@@ -1,3 +1,4 @@
+from app.models.booking import Booking, BookingStatus
 from app.models.payment import Payment
 from app.models.webhook_event import WebhookEvent
 
@@ -126,3 +127,19 @@ def test_webhook_invalid_status_value(client):
         json={"event_id": "evt_1", "transaction_id": "abc", "status": "MAYBE"},
     )
     assert res.status_code == 422
+
+
+def test_webhook_does_not_revive_cancelled_booking(client, db, booking, auth_headers, monkeypatch):
+    monkeypatch.setattr(SUCCESS_ROLL, lambda: 0.95)
+    payment = pay(client, auth_headers, booking["id"]).json()
+
+    row = db.get(Booking, booking["id"])
+    row.status = BookingStatus.CANCELLED
+    db.commit()
+
+    res = client.post(
+        "/payments/webhook/",
+        json={"event_id": "evt_1", "transaction_id": payment["transaction_id"], "status": "SUCCESS"},
+    )
+    assert res.status_code == 200
+    assert res.json()["booking_status"] == "CANCELLED"

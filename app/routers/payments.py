@@ -67,11 +67,12 @@ def payment_webhook(payload: PaymentWebhookPayload, db: Session = Depends(get_db
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found for this payment")
 
-    payment.status = payload.status
-    booking.status = BookingStatus.CONFIRMED if payload.status == PaymentStatus.SUCCESS else BookingStatus.FAILED
+    ignored = booking.status == BookingStatus.CANCELLED
+    if not ignored:
+        payment.status = payload.status
+        booking.status = BookingStatus.CONFIRMED if payload.status == PaymentStatus.SUCCESS else BookingStatus.FAILED
 
-    webhook_event = WebhookEvent(event_id=payload.event_id, payload=payload.model_dump_json())
-    db.add(webhook_event)
+    db.add(WebhookEvent(event_id=payload.event_id, payload=payload.model_dump_json()))
 
     try:
         db.commit()
@@ -79,4 +80,6 @@ def payment_webhook(payload: PaymentWebhookPayload, db: Session = Depends(get_db
         db.rollback()
         return {"detail": "Event already processed", "event_id": payload.event_id}
 
+    if ignored:
+        return {"detail": "Booking is cancelled, update ignored", "booking_status": booking.status.value}
     return {"detail": "Webhook processed", "booking_status": booking.status.value}
